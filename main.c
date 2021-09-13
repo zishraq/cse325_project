@@ -8,20 +8,22 @@
 
 #define BUFFER_LIMIT 10000
 
-sem_t semEmpty;
-sem_t semFull;
-
-pthread_mutex_t mutexBuffer;
+sem_t sem_empty;
+sem_t sem_full;
+sem_t mutex;
 
 int buffer[BUFFER_LIMIT];
 int *assorted_box;
 int assorted_box_store[BUFFER_LIMIT][BUFFER_LIMIT];
-int count = 0;
+int insert_count = 0;
+int extract_count = 0;
 int candy_types_so_far = 0;
 int assorted_boxes_count = 0;
 int assorted_boxes_store_count = 0;
 
+
 void printAndStoreAssortedBox(int *array, int size) {
+    printf("**** An Assorted box created ****\n");
     printf("Candies are no. ");
     for (int i = 0; i < size; i++) {
         assorted_box_store[assorted_boxes_store_count][i] = *(array + i);
@@ -38,39 +40,38 @@ void printAndStoreAssortedBox(int *array, int size) {
 }
 
 void *producer(void *args) {
-    // produce
     int x = *(int *) args + 1;
 
-    // add to the buffer
-    sem_wait(&semEmpty);
-    pthread_mutex_lock(&mutexBuffer);
+    sem_wait(&sem_empty);
+    sem_wait(&mutex);
 
-    buffer[count] = x;
-    count++;
+    buffer[insert_count] = x;
+    insert_count++;
 
-    printf("Produced -> candy no. %d\n", x);
+    printf("Produced -->> candy no. %d\n", x);
     printf("\n");
 
-    pthread_mutex_unlock(&mutexBuffer);
-    sem_post(&semFull);
+    sem_post(&mutex);
+    sem_post(&sem_full);
 }
 
 void *consumer(void *args) {
     int candy;
     int candy_types = *(int *) args;
 
-    // remove from the buffer
-    sem_wait(&semFull);
-    pthread_mutex_lock(&mutexBuffer);
+    sem_wait(&sem_full);
+    sem_wait(&mutex);
 
-    candy = buffer[count - 1];
-    count--;
+    candy = buffer[extract_count % insert_count];
+    extract_count++;
     assorted_box[candy_types_so_far] = candy;
     candy_types_so_far++;
 
+    printf("Consumed <<-- candy no. %d\n", candy);
+    printf("\n");
+
     if (candy_types_so_far == candy_types) {
         assorted_boxes_count += 1;
-        printf("**** An Assorted box created ****\n");
 
         printAndStoreAssortedBox(assorted_box, candy_types);
         printf("\n");
@@ -78,12 +79,8 @@ void *consumer(void *args) {
         candy_types_so_far = 0;
     }
 
-    // consume
-    printf("Consumed <- candy no. %d\n", candy);
-    printf("\n");
-
-    pthread_mutex_unlock(&mutexBuffer);
-    sem_post(&semEmpty);
+    sem_post(&mutex);
+    sem_post(&sem_empty);
 }
 
 int main(int argc, char *argv[]) {
@@ -111,10 +108,9 @@ int main(int argc, char *argv[]) {
     pthread_t *producer_threads = (pthread_t *) malloc(producers * sizeof(pthread_t));
     pthread_t *consumer_threads = (pthread_t *) malloc(consumers * sizeof(pthread_t));
 
-    pthread_mutex_init(&mutexBuffer, NULL);
-
-    sem_init(&semEmpty, 0, producers);
-    sem_init(&semFull, 0, 0);
+    sem_init(&sem_empty, 0, producers);
+    sem_init(&sem_full, 0, 0);
+    sem_init(&mutex, 0, 1);
 
     int i = 0, j = 0;
     while (1) {
@@ -169,18 +165,18 @@ int main(int argc, char *argv[]) {
     if (is_consumers_more) {
         printf("%d candies short in production\n", difference);
     }
-    else if (!is_consumers_more && difference > 0) {
-        printf("%d more candies remain in the factory\n", difference);
+    else if (difference > 0) {
+        printf("%d candies remain in the factory\n", difference);
     }
     else {
-        printf("No more candies left\n");
+        printf("No more candies left in the factory\n");
     }
 
     printf("%d assorted boxes served\n", assorted_boxes_count);
 
-    sem_destroy(&semEmpty);
-    sem_destroy(&semFull);
-    pthread_mutex_destroy(&mutexBuffer);
+    sem_destroy(&sem_empty);
+    sem_destroy(&sem_full);
+    sem_destroy(&mutex);
 
     return 0;
 }
