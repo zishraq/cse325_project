@@ -6,7 +6,7 @@
 #include <time.h>
 #include <semaphore.h>
 
-#define BUFFER_LIMIT 10000
+#define BUFFER_LIMIT 1000000
 
 sem_t sem_empty;
 sem_t sem_full;
@@ -14,7 +14,7 @@ sem_t mutex;
 
 int buffer[BUFFER_LIMIT];
 int *assorted_box;
-int assorted_box_store[BUFFER_LIMIT][BUFFER_LIMIT];
+int **assorted_box_store;
 int insert_count = 0;
 int extract_count = 0;
 int candy_types_so_far = 0;
@@ -53,6 +53,7 @@ void *producer(void *args) {
 
     sem_post(&mutex);
     sem_post(&sem_full);
+    free(args);
 }
 
 void *consumer(void *args) {
@@ -81,6 +82,7 @@ void *consumer(void *args) {
 
     sem_post(&mutex);
     sem_post(&sem_empty);
+    free(args);
 }
 
 int main(int argc, char *argv[]) {
@@ -105,6 +107,14 @@ int main(int argc, char *argv[]) {
         consumers = producers;
     }
 
+    int expected_assorted_boxes = consumers / candy_types;
+
+    assorted_box_store = (int **) malloc(expected_assorted_boxes * sizeof(int *));
+
+    for (int i = 0; i < expected_assorted_boxes; i++) {
+        assorted_box_store[i] = (int *) malloc(candy_types * sizeof(int));
+    }
+
     pthread_t *producer_threads = (pthread_t *) malloc(producers * sizeof(pthread_t));
     pthread_t *consumer_threads = (pthread_t *) malloc(consumers * sizeof(pthread_t));
 
@@ -113,6 +123,7 @@ int main(int argc, char *argv[]) {
     sem_init(&mutex, 0, 1);
 
     int i = 0, j = 0;
+
     while (1) {
         if (i == producers && j == consumers) {
             break;
@@ -177,6 +188,8 @@ int main(int argc, char *argv[]) {
     sem_destroy(&sem_empty);
     sem_destroy(&sem_full);
     sem_destroy(&mutex);
+    free(assorted_box);
+    free(assorted_box_store);
 
     return 0;
 }
