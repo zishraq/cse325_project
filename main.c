@@ -40,16 +40,16 @@ void printAndStoreAssortedBox(int *array, int size) {
 }
 
 void *producer(void *args) {
-    int x = *(int *) args + 1;
-
     sem_wait(&sem_empty);
     sem_wait(&mutex);
 
-    buffer[insert_count] = x;
-    insert_count++;
+    int candy = insert_count + 1;
+    buffer[insert_count] = candy;
 
-    printf("Produced -->> candy no. %d\n", x);
+    printf("Produced -->> candy no. %d\n", candy);
     printf("\n");
+
+    insert_count++;
 
     sem_post(&mutex);
     sem_post(&sem_full);
@@ -64,7 +64,9 @@ void *consumer(void *args) {
     sem_wait(&mutex);
 
     candy = buffer[extract_count % insert_count];
+//    candy = buffer[extract_count];
     extract_count++;
+
     assorted_box[candy_types_so_far] = candy;
     candy_types_so_far++;
 
@@ -130,10 +132,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (i < producers) {
-            int *value_to_pass = malloc(sizeof(int));
-            *value_to_pass = i;
-
-            if (pthread_create(&producer_threads[i], NULL, &producer, value_to_pass) != 0) {
+            if (pthread_create(&producer_threads[i], NULL, &producer, NULL) != 0) {
                 perror("Failed to create thread");
             }
             i++;
