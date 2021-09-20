@@ -15,9 +15,8 @@ sem_t mutex;
 int buffer[BUFFER_LIMIT];
 int *assorted_box;
 int **assorted_box_store;
-int insert_count = 0;
-int extract_count = 0;
-int candy_types_so_far = 0;
+int insert_index = 0;
+int extract_index = 0;
 int assorted_boxes_count = 0;
 int assorted_boxes_store_count = 0;
 
@@ -43,13 +42,13 @@ void *producer(void *args) {
     sem_wait(&sem_empty);
     sem_wait(&mutex);
 
-    int candy = insert_count + 1;
-    buffer[insert_count] = candy;
+    int candy = insert_index + 1;
+    buffer[insert_index] = candy;
 
     printf("Produced -->> candy no. %d\n", candy);
     printf("\n");
 
-    insert_count++;
+    insert_index++;
 
     sem_post(&mutex);
     sem_post(&sem_full);
@@ -63,24 +62,21 @@ void *consumer(void *args) {
     sem_wait(&sem_full);
     sem_wait(&mutex);
 
-    candy = buffer[extract_count % insert_count];
-//    candy = buffer[extract_count];
-    extract_count++;
+    candy = buffer[extract_index];
 
-    assorted_box[candy_types_so_far] = candy;
-    candy_types_so_far++;
+    assorted_box[extract_index % candy_types] = candy;
 
     printf("Consumed <<-- candy no. %d\n", candy);
     printf("\n");
 
-    if (candy_types_so_far == candy_types) {
+    if (extract_index % candy_types == candy_types - 1) {
         assorted_boxes_count += 1;
 
         printAndStoreAssortedBox(assorted_box, candy_types);
         printf("\n");
-
-        candy_types_so_far = 0;
     }
+
+    extract_index++;
 
     sem_post(&mutex);
     sem_post(&sem_empty);
@@ -90,7 +86,7 @@ void *consumer(void *args) {
 int main(int argc, char *argv[]) {
     printf("*********************************************\n");
     printf("*                                           *\n");
-    printf("*            AMHERST CANDY FACTORY          *\n");
+    printf("*           AMHERST CANDY FACTORY           *\n");
     printf("*                                           *\n");
     printf("*********************************************\n");
     printf("\n");
@@ -182,13 +178,16 @@ int main(int argc, char *argv[]) {
         printf("No more candies left in the factory\n");
     }
 
-    printf("%d assorted boxes served\n", assorted_boxes_count);
+    printf("%d assorted boxes served with %d candies\n", assorted_boxes_count, assorted_boxes_count * candy_types);
+    printf("%d candies consumed but not boxed\n", consumers - assorted_boxes_count * candy_types);
 
     sem_destroy(&sem_empty);
     sem_destroy(&sem_full);
     sem_destroy(&mutex);
     free(assorted_box);
     free(assorted_box_store);
+    free(producer_threads);
+    free(consumer_threads);
 
     return 0;
 }
